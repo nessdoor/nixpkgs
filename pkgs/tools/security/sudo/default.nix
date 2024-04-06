@@ -5,10 +5,12 @@
 , coreutils
 , pam
 , groff
+, openldap
 , sssd
 , nixosTests
 , sendmailPath ? "/run/wrappers/bin/sendmail"
 , withInsults ? false
+, withLdap ? false
 , withSssd ? false
 }:
 
@@ -40,6 +42,8 @@ stdenv.mkDerivation (finalAttrs: {
   ] ++ lib.optionals withInsults [
     "--with-insults"
     "--with-all-insults"
+  ] ++ lib.optionals withLdap [
+    "--with-ldap=${openldap.dev}"
   ] ++ lib.optionals withSssd [
     "--with-sssd"
     "--with-sssd-lib=${sssd}/lib"
@@ -61,7 +65,9 @@ stdenv.mkDerivation (finalAttrs: {
 
   depsBuildBuild = [ buildPackages.stdenv.cc ];
   nativeBuildInputs = [ groff ];
-  buildInputs = [ pam ];
+  buildInputs = [
+    pam
+  ] ++ lib.optional withLdap openldap;
 
   enableParallelBuilding = true;
 
