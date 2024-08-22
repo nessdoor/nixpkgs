@@ -250,6 +250,24 @@ in {
         '';
       };
 
+      privilegedAdministrators = mkOption {
+        default = null;
+        type = types.nullOr (types.listOf types.str);
+        description = ''
+          List of AFS principals that are allowed to carry out privileged
+          administrative operations. If set to `null`, AFS servers will use the
+          contents of any pre-existing `/etc/openafs/server/UserList` file,
+          instead (see {manpage}`UserList(5)`).
+
+          Be advised that changing the value of this attribute to anything other
+          than `null` deletes any pre-existing content from
+          `/etc/openafs/server/UserList` on server startup. Further changes to
+          the list of privileged administrators via the `bos adduser` and `bos
+          removeuser` commands will also be discarded at the next startup.
+        '';
+        example = literalExpression "[ root.admin ]";
+      };
+
     };
 
   };
@@ -303,9 +321,18 @@ in {
           mkdir -m 0755 -p /var/openafs
           ${optionalString (netInfo != null) "cp ${netInfo} /var/openafs/netInfo"}
           ${optionalString useBuCellServDB "cp ${buCellServDB}"}
+        '' + lib.optionalString (cfg.privilegedAdministrators != null) ''
+          rm -f /etc/openafs/server/UserList
         '';
         serviceConfig = {
           ExecStart = "${openafsBin}/bin/bosserver -nofork";
+          ExecStartPost = mkIf (cfg.privilegedAdministrators != null)
+            (pkgs.writeShellScript "openafs-admin-init" ''
+               for admin in ${lib.concatStringsSep " " cfg.privilegedAdministrators}
+               do
+                  ${openafsBin}/bin/bos adduser localhost "$admin" -localauth
+                done
+            '');
           ExecStop = "${openafsBin}/bin/bos shutdown localhost -wait -localauth";
         };
       };
